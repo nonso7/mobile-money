@@ -43,7 +43,7 @@ jobs:
           [ -z "${{ secrets.STELLAR_ISSUER_SECRET }}" ] && MISSING_VARS+=("STELLAR_ISSUER_SECRET")
           
           if [ ${#MISSING_VARS[@]} -ne 0 ]; then
-            echo "❌ Error: Missing required environment variables:"
+            echo "Error: Missing required environment variables:"
             printf '  - %s\n' "${MISSING_VARS[@]}"
             exit 1
           fi
@@ -114,7 +114,7 @@ jobs:
             ELAPSED=$((ELAPSED + INTERVAL))
           done
           
-          echo "❌ Health check failed: Timeout after ${TIMEOUT}s"
+          echo "Health check failed: Timeout after ${TIMEOUT}s"
           echo "Fetching container logs for debugging..."
           docker compose -f docker-compose.yml logs --tail=50
           exit 1
@@ -122,7 +122,7 @@ jobs:
       - name: Notify deployment failure
         if: failure()
         run: |
-          echo "❌ Deployment to staging failed!"
+          echo "Deployment to staging failed!"
           echo "Commit SHA: ${{ github.event.workflow_run.head_sha }}"
           echo "Triggered by: ${{ github.event.workflow_run.head_commit.author.name }}"
           echo "Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
