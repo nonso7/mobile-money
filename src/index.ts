@@ -27,6 +27,7 @@ import {
 
 import { register } from "./utils/metrics";
 import { metricsMiddleware } from "./middleware/metrics";
+import { requestLogger } from "./middleware/logger";
 
 dotenv.config();
 
@@ -41,6 +42,7 @@ const limiter = rateLimit({
 
 // Middleware
 app.use(metricsMiddleware); // Register metrics middleware early
+app.use(requestLogger);
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
