@@ -1,8 +1,8 @@
+import "./config/env";
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import dotenv from "dotenv";
 
 import { transactionRoutes } from "./routes/transactions";
 import { bulkRoutes } from "./routes/bulk";
@@ -29,8 +29,6 @@ import { startJobs } from "./jobs/scheduler";
 import { register } from "./utils/metrics";
 import { metricsMiddleware } from "./middleware/metrics";
 import { HealthCheckResponse, ReadinessCheckResponse } from "./types/api";
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -179,16 +177,13 @@ app.use("/admin/queues", queueRouter);
 // --- START SERVER LOGIC ---
 // We check if we are in a test environment to prevent port collisions
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(
+      `Rate limit: ${RATE_LIMIT_MAX_REQUESTS} requests per ${RATE_LIMIT_WINDOW_MS / 1000}s`,
+    );
+  });
 }
 
 // Export the app instance for Supertest integration tests
-export default app;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(
-    `Rate limit: ${RATE_LIMIT_MAX_REQUESTS} requests per ${RATE_LIMIT_WINDOW_MS / 1000}s`,
-  );
-});
-
 export default app;

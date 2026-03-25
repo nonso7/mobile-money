@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { z } from "zod";
+import { pool } from "../config/database";
 import { StellarService } from "../services/stellar/stellarService";
 import { MobileMoneyService } from "../services/mobilemoney/mobileMoneyService";
 import { TransactionModel, TransactionStatus } from "../models/transaction";
@@ -344,10 +345,6 @@ export const getTransactionHandler = async (req: Request, res: Response) => {
       jobProgress = await getJobProgress(id);
     }
 
-    const timeoutMinutes = Number(
-      process.env.TRANSACTION_TIMEOUT_MINUTES || 30,
-    );
-
     if (transaction.status === TransactionStatus.Pending) {
       const createdAt = new Date(transaction.createdAt).getTime();
       const diffMinutes = (Date.now() - createdAt) / (1000 * 60);
@@ -393,8 +390,6 @@ export const cancelTransactionHandler = async (req: Request, res: Response) => {
       });
     }
 
-    const updatedTransaction = await transactionModel.updateStatus(id, TransactionStatus.Cancelled);
-    await transactionModel.updateStatus(id, TransactionStatus.Cancelled);
     const updatedTransaction = await transactionModel.findById(id);
     if (!updatedTransaction)
       return res
@@ -419,8 +414,7 @@ export const cancelTransactionHandler = async (req: Request, res: Response) => {
     res.json({
       message: "Transaction cancelled successfully",
       transaction: updatedTransaction,
-    };
-    return res.json(body);
+    });
   } catch (err) {
     console.error("Failed to cancel transaction:", err);
     res.status(500).json({ error: "Failed to cancel transaction" });
