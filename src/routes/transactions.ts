@@ -6,6 +6,7 @@ import {
   updateNotesHandler,
   searchTransactionsHandler,
   listTransactionsHandler,
+  validateTransaction,
 } from "../controllers/transactionController";
 import { TimeoutPresets, haltOnTimedout } from "../middleware/timeout";
 import { validateTransactionFilters } from "../utils/transactionFilters";
@@ -18,7 +19,7 @@ transactionRoutes.post(
   TimeoutPresets.long,
   haltOnTimedout,
   validateTransaction,
-  depositHandler
+  depositHandler,
 );
 
 // Withdraw route
@@ -27,7 +28,7 @@ transactionRoutes.post(
   TimeoutPresets.long,
   haltOnTimedout,
   validateTransaction,
-  withdrawHandler
+  withdrawHandler,
 );
 
 // List transactions with status filtering and pagination
@@ -37,14 +38,6 @@ transactionRoutes.get(
   haltOnTimedout,
   validateTransactionFilters,
   listTransactionsHandler,
-);
-
-// Quick read operation
-transactionRoutes.get(
-  "/:id",
-  TimeoutPresets.quick,
-  haltOnTimedout,
-  getTransactionHandler,
 );
 
 // Notes and search
@@ -60,4 +53,12 @@ transactionRoutes.get(
   TimeoutPresets.quick,
   haltOnTimedout,
   searchTransactionsHandler,
+);
+
+// Get single transaction
+transactionRoutes.get(
+  "/:id",
+  TimeoutPresets.quick,
+  haltOnTimedout,
+  getTransactionHandler,
 );
