@@ -43,29 +43,82 @@ export const transactionWorker = new Worker<
 
     console.log(`[${job.id}] Processing ${type} transaction: ${transactionId}`);
 
+    const maxAttempts = Math.max(
+      1,
+      parseInt(process.env.MAX_RETRY_ATTEMPTS || "3", 10),
+    );
+    const baseDelayMs = Math.max(
+      0,
+      parseInt(process.env.RETRY_DELAY_MS || "1000", 10),
+    );
+
+    const retryConfig = {
+      maxAttempts,
+      baseDelayMs,
+      onRetry: async ({
+        attempt,
+        error,
+      }: {
+        attempt: number;
+        error: unknown;
+      }) => {
+        await transactionModel.incrementRetryCount(transactionId);
+        console.warn(
+          `[${job.id}] transient failure (attempt ${attempt}), will retry:`,
+          error instanceof Error ? error.message : error,
+        );
+      },
+    };
+
+    const sendTxnSms = async (
+      kind: "transaction_completed" | "transaction_failed",
+      errorMessage?: string,
+    ) => {
+      try {
+        const txRow = await transactionModel.findById(transactionId);
+        const ref = txRow?.referenceNumber ?? transactionId;
+        await smsService.notifyTransactionEvent(phoneNumber, {
+          referenceNumber: ref,
+          type,
+          amount: String(amount),
+          provider,
+          kind,
+          errorMessage,
+        });
+      } catch (smsErr) {
+        console.error(`[${job.id}] SMS notification error`, smsErr);
+      }
+    };
+
     try {
       await job.updateProgress(10);
 
       if (type === "deposit") {
         await job.updateProgress(20);
 
-        const mobileMoneyResult = await mobileMoneyService.initiatePayment(
-          provider,
-          phoneNumber,
-          amount,
-        );
+        await withRetry(async () => {
+          const mobileMoneyResult = await mobileMoneyService.initiatePayment(
+            provider,
+            phoneNumber,
+            amount,
+          );
+          if (!mobileMoneyResult.success) {
+            throw new Error(
+              (mobileMoneyResult.error as string) ||
+                "Payment initiation failed",
+            );
+          }
+          return mobileMoneyResult;
+        }, retryConfig);
 
         await job.updateProgress(50);
 
-        if (!mobileMoneyResult.success) {
-          throw new Error(
-            (mobileMoneyResult.error as string) || "Payment initiation failed",
-          );
-        }
-
         await job.updateProgress(70);
 
-        await stellarService.sendPayment(stellarAddress, amount);
+        await withRetry(
+          () => stellarService.sendPayment(stellarAddress, amount),
+          retryConfig,
+        );
 
         await job.updateProgress(90);
 
@@ -86,6 +139,8 @@ export const transactionWorker = new Worker<
             await emailService.sendTransactionReceipt(user.email, transaction);
           }
         }
+
+        await sendTxnSms("transaction_completed");
 
         await job.updateProgress(100);
 
@@ -100,19 +155,21 @@ export const transactionWorker = new Worker<
       } else {
         await job.updateProgress(20);
 
-        const mobileMoneyResult = await mobileMoneyService.sendPayout(
-          provider,
-          phoneNumber,
-          amount,
-        );
+        await withRetry(async () => {
+          const mobileMoneyResult = await mobileMoneyService.sendPayout(
+            provider,
+            phoneNumber,
+            amount,
+          );
+          if (!mobileMoneyResult.success) {
+            throw new Error(
+              (mobileMoneyResult.error as string) || "Payout failed",
+            );
+          }
+          return mobileMoneyResult;
+        }, retryConfig);
 
         await job.updateProgress(50);
-
-        if (!mobileMoneyResult.success) {
-          throw new Error(
-            (mobileMoneyResult.error as string) || "Payout failed",
-          );
-        }
 
         await job.updateProgress(90);
 
@@ -133,6 +190,8 @@ export const transactionWorker = new Worker<
             await emailService.sendTransactionReceipt(user.email, transaction);
           }
         }
+
+        await sendTxnSms("transaction_completed");
 
         await job.updateProgress(100);
 
