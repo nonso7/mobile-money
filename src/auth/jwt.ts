@@ -9,6 +9,7 @@ const JWT_EXPIRES_IN = '1h';
 export interface JWTPayload {
   userId: string;
   email: string;
+  role?: string;
   iat?: number;
   exp?: number;
 }

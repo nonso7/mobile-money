@@ -53,3 +53,69 @@ ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id);
 
 CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_user_created ON transactions(user_id, created_at);
+
+-- RBAC Tables
+-- Roles table
+CREATE TABLE IF NOT EXISTS roles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(50) UNIQUE NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Permissions table
+CREATE TABLE IF NOT EXISTS permissions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(50) UNIQUE NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Role permissions junction table
+CREATE TABLE IF NOT EXISTS role_permissions (
+  role_id UUID REFERENCES roles(id) ON DELETE CASCADE,
+  permission_id UUID REFERENCES permissions(id) ON DELETE CASCADE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (role_id, permission_id)
+);
+
+-- Add role_id to users table
+ALTER TABLE users 
+ADD COLUMN IF NOT EXISTS role_id UUID REFERENCES roles(id);
+
+-- Create indexes for RBAC tables
+CREATE INDEX IF NOT EXISTS idx_roles_name ON roles(name);
+CREATE INDEX IF NOT EXISTS idx_permissions_name ON permissions(name);
+CREATE INDEX IF NOT EXISTS idx_role_permissions_role_id ON role_permissions(role_id);
+CREATE INDEX IF NOT EXISTS idx_role_permissions_permission_id ON role_permissions(permission_id);
+CREATE INDEX IF NOT EXISTS idx_users_role_id ON users(role_id);
+
+-- Auto-update updated_at for roles
+CREATE OR REPLACE FUNCTION update_roles_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = CURRENT_TIMESTAMP;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS roles_updated_at ON roles;
+CREATE TRIGGER roles_updated_at
+  BEFORE UPDATE ON roles
+  FOR EACH ROW EXECUTE FUNCTION update_roles_updated_at();
+
+-- Auto-update updated_at for permissions
+CREATE OR REPLACE FUNCTION update_permissions_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = CURRENT_TIMESTAMP;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS permissions_updated_at ON permissions;
+CREATE TRIGGER permissions_updated_at
+  BEFORE UPDATE ON permissions
+  FOR EACH ROW EXECUTE FUNCTION update_permissions_updated_at();

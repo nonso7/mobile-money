@@ -1,45 +1,59 @@
 import { Router, Request, Response } from 'express';
 import { generateToken, verifyToken, JWTPayload } from '../auth/jwt';
+import { authenticateUser, getUserById } from '../services/userService';
+import { authenticateToken } from '../middleware/auth';
+import { attachUserContext } from '../middleware/rbac';
 
 export const authRoutes = Router();
 
 /**
  * POST /api/auth/login
  * 
- * Example login endpoint that generates a JWT token
- * In a real application, this would validate user credentials against a database
+ * Login endpoint that generates a JWT token with role information
+ * Uses phone number for authentication (simplified for demo)
  */
-authRoutes.post('/login', (req: Request, res: Response) => {
-  const { userId, email } = req.body;
+authRoutes.post('/login', async (req: Request, res: Response) => {
+  const { phone_number } = req.body;
 
   // Basic validation
-  if (!userId || !email) {
+  if (!phone_number) {
     return res.status(400).json({
       error: 'Missing required fields',
-      message: 'userId and email are required'
+      message: 'phone_number is required'
     });
   }
 
-  // In a real app, you would:
-  // 1. Validate user credentials against database
-  // 2. Check password hash
-  // 3. Verify user is active
-  
   try {
-    // Generate JWT token
-    const token = generateToken({ userId, email });
+    // Authenticate user (creates user if doesn't exist)
+    const user = await authenticateUser(phone_number);
+    
+    if (!user) {
+      return res.status(401).json({
+        error: 'Authentication failed',
+        message: 'Invalid phone number'
+      });
+    }
+
+    // Generate JWT token with role
+    const token = generateToken({ 
+      userId: user.id, 
+      email: `${phone_number}@mobile-money.local`, // Generate email from phone
+      role: user.role_name || 'user'
+    });
     
     res.json({
       message: 'Login successful',
       token,
       user: {
-        userId,
-        email
+        userId: user.id,
+        phone_number: user.phone_number,
+        kyc_level: user.kyc_level,
+        role: user.role_name || 'user'
       }
     });
   } catch (error) {
     res.status(500).json({
-      error: 'Token generation failed',
+      error: 'Login failed',
       message: error instanceof Error ? error.message : 'Unknown error'
     });
   }
@@ -78,55 +92,45 @@ authRoutes.post('/verify', (req: Request, res: Response) => {
 /**
  * GET /api/auth/me
  * 
- * Protected route that returns current user information
+ * Protected route that returns current user information with role and permissions
  * Requires valid JWT token in Authorization header
  */
-authRoutes.get('/me', (req: Request, res: Response) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({
-      error: 'Access denied',
-      message: 'No token provided'
-    });
-  }
-
+authRoutes.get('/me', authenticateToken, attachUserContext, async (req: Request, res: Response) => {
   try {
-    const payload = verifyToken(token);
+    if (!req.jwtUser) {
+      return res.status(401).json({
+        error: 'Access denied',
+        message: 'No token provided'
+      });
+    }
+
+    // Get full user information
+    const user = await getUserById(req.jwtUser.userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        error: 'User not found',
+        message: 'User associated with token no longer exists'
+      });
+    }
+
     res.json({
       user: {
-        userId: payload.userId,
-        email: payload.email
+        userId: user.id,
+        phone_number: user.phone_number,
+        kyc_level: user.kyc_level,
+        role: user.role_name || 'user',
+        permissions: req.userPermissions || []
       },
       tokenInfo: {
-        issuedAt: payload.iat,
-        expiresAt: payload.exp
+        issuedAt: req.jwtUser.iat,
+        expiresAt: req.jwtUser.exp
       }
     });
   } catch (error) {
-    if (error instanceof Error) {
-      if (error.message === 'Token has expired') {
-        res.status(401).json({
-          error: 'Token expired',
-          message: 'Please log in again'
-        });
-      } else if (error.message === 'Invalid token') {
-        res.status(401).json({
-          error: 'Invalid token',
-          message: 'Token is malformed or tampered with'
-        });
-      } else {
-        res.status(401).json({
-          error: 'Authentication failed',
-          message: error.message
-        });
-      }
-    } else {
-      res.status(401).json({
-        error: 'Authentication failed',
-        message: 'Unknown error occurred'
-      });
-    }
+    res.status(500).json({
+      error: 'Failed to get user information',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 });
