@@ -3,6 +3,7 @@ import {
   Counter,
   Histogram,
   Gauge,
+  Summary,
   collectDefaultMetrics,
 } from "prom-client";
 
@@ -47,7 +48,23 @@ export const providerResponseTimeSeconds = new Histogram({
   name: "provider_response_time_seconds",
   help: "Response time of mobile money provider API calls in seconds",
   labelNames: ["provider", "operation", "status"],
-  buckets: [0.1, 0.5, 1, 2, 5, 10, 20, 30],
+  buckets: [0.1, 0.25, 0.5, 1, 2.5, 5, 10, 20, 30, 60],
+  registers: [register],
+});
+
+export const providerResponseTimeSummary = new Summary({
+  name: "provider_response_time_summary",
+  help: "Precise quantiles for mobile money provider response times",
+  labelNames: ["provider", "operation", "status"],
+  percentiles: [0.5, 0.9, 0.95, 0.99],
+  registers: [register],
+});
+
+export const healthCheckResponseTimeSeconds = new Histogram({
+  name: "health_check_response_time_seconds",
+  help: "Response time for mobile money health pings",
+  labelNames: ["provider", "status"],
+  buckets: [0.1, 0.5, 1, 2, 5, 10],
   registers: [register],
 });
 

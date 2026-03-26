@@ -5,9 +5,12 @@ import {
   transactionTotal,
   transactionErrorsTotal,
   providerResponseTimeSeconds,
+  providerResponseTimeSummary,
   slowRequestsTotal,
   timeoutRequestsTotal,
 } from "../../utils/metrics";
+import { pool } from "../../config/database";
+import { MonitoringService } from "../monitoringService";
 
 interface MobileMoneyProvider {
   requestPayment(
@@ -68,10 +71,21 @@ export class MobileMoneyService {
     } finally {
       const duration = process.hrtime(start);
       const durationSeconds = duration[0] + duration[1] / 1e9;
+      const durationMs = Math.round(durationSeconds * 1000);
 
+      // Prometheus metrics
       providerResponseTimeSeconds.observe(
         { provider, operation, status },
         durationSeconds,
+      );
+      providerResponseTimeSummary.observe(
+        { provider, operation, status },
+        durationSeconds,
+      );
+
+      // Persistent logging to Database
+      this.logToDatabase(provider, operation, status, durationMs).catch((err) =>
+        console.error("Failed to log provider performance to DB", err),
       );
 
       if (durationSeconds > 5) {
@@ -83,10 +97,32 @@ export class MobileMoneyService {
             message: "Slow mobile money provider response",
             provider,
             operation,
-            durationSeconds: Math.round(durationSeconds * 1000) / 1000,
+            durationSeconds,
+            status,
           }),
         );
+
+        // Immediate monitoring check
+        MonitoringService.checkPerformance(provider, operation);
       }
+    }
+  }
+
+  private async logToDatabase(
+    provider: string,
+    operation: string,
+    status: string,
+    durationMs: number,
+    errorMessage?: string,
+  ) {
+    try {
+      await pool.query(
+        "INSERT INTO provider_performance_logs (provider, operation, status, duration_ms, error_message) VALUES ($1, $2, $3, $4, $5)",
+        [provider, operation, status, durationMs, errorMessage],
+      );
+    } catch (error) {
+      // Don't throw, just log. We don't want performance logging to break the main flow.
+      console.error("Database logging error", error);
     }
   }
 

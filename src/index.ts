@@ -29,6 +29,7 @@ import { startJobs } from "./jobs/scheduler";
 
 import { register } from "./utils/metrics";
 import { metricsMiddleware } from "./middleware/metrics";
+import { MonitoringService } from "./services/monitoringService";
 
 dotenv.config();
 
@@ -81,11 +82,6 @@ app.use(responseTime);
 app.get("/health", (req, res) =>
   res.json({ status: "ok", timestamp: new Date().toISOString() }),
 );
-
-// Basic health check
-app.get("/health", (req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
-});
 
 /**
  * Readiness probe (DB + Redis)
@@ -177,6 +173,9 @@ app.listen(PORT, () => {
   console.log(
     `Rate limit: ${RATE_LIMIT_MAX_REQUESTS} requests per ${RATE_LIMIT_WINDOW_MS / 1000}s`,
   );
+
+  // Start performance monitoring service
+  MonitoringService.start();
 });
 
 export default app;
