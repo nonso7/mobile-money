@@ -1,7 +1,13 @@
 import { MTNProvider } from "./providers/mtn";
-import { AirtelService } from "./providers/airtel";
+import { AirtelProvider } from "./providers/airtel";
 import { OrangeProvider } from "./providers/orange";
-import { transactionTotal, transactionErrorsTotal } from "../../utils/metrics";
+import {
+  transactionTotal,
+  transactionErrorsTotal,
+  providerResponseTimeSeconds,
+  slowRequestsTotal,
+  timeoutRequestsTotal,
+} from "../../utils/metrics";
 
 interface MobileMoneyProvider {
   requestPayment(
@@ -30,9 +36,55 @@ export class MobileMoneyService {
   constructor() {
     this.providers = new Map<string, MobileMoneyProvider>([
       ["mtn", new MTNProvider()],
-      ["airtel", new AirtelService()],
+      ["airtel", new AirtelProvider()],
       ["orange", new OrangeProvider()],
     ]);
+  }
+
+  private async executeWithTracking(
+    provider: string,
+    operation: string,
+    fn: () => Promise<{ success: boolean; data?: unknown; error?: unknown }>,
+  ) {
+    const start = process.hrtime();
+    let status = "success";
+
+    try {
+      const result = await fn();
+      if (!result.success) {
+        status = "failure";
+      }
+      return result;
+    } catch (error) {
+      status = "error";
+      const err = error as any;
+      if (err.code === "ECONNABORTED" || err.message?.toLowerCase().includes("timeout")) {
+        timeoutRequestsTotal.inc({ provider, operation });
+      }
+      throw error;
+    } finally {
+      const duration = process.hrtime(start);
+      const durationSeconds = duration[0] + duration[1] / 1e9;
+
+      providerResponseTimeSeconds.observe(
+        { provider, operation, status },
+        durationSeconds,
+      );
+
+      if (durationSeconds > 5) {
+        slowRequestsTotal.inc({ provider, operation });
+        console.warn(
+          JSON.stringify({
+            timestamp: new Date().toISOString(),
+            level: "warn",
+            message: "Slow mobile money provider response",
+            provider,
+            operation,
+            durationSeconds: Math.round(durationSeconds * 1000) / 1000,
+          }),
+        );
+      }
+    }
   }
 
   async initiatePayment(provider: string, phoneNumber: string, amount: string) {
@@ -48,7 +100,11 @@ export class MobileMoneyService {
     }
 
     try {
-      const result = await providerInstance.requestPayment(phoneNumber, amount);
+      const result = await this.executeWithTracking(
+        providerKey,
+        "payment",
+        () => providerInstance.requestPayment(phoneNumber, amount),
+      );
 
       if (result.success) {
         transactionTotal.inc({
@@ -110,7 +166,11 @@ export class MobileMoneyService {
     }
 
     try {
-      const result = await providerInstance.sendPayout(phoneNumber, amount);
+      const result = await this.executeWithTracking(
+        providerKey,
+        "payout",
+        () => providerInstance.sendPayout(phoneNumber, amount),
+      );
 
       if (result.success) {
         transactionTotal.inc({

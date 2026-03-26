@@ -117,6 +117,16 @@ app.get("/ready", async (req, res) => {
   });
 });
 
+// Metrics endpoint
+app.get("/metrics", async (req: Request, res: Response) => {
+  try {
+    res.set("Content-Type", register.contentType);
+    res.end(await register.metrics());
+  } catch (err) {
+    res.status(500).end(err);
+  }
+});
+
 // Timeout middleware
 app.use(globalTimeout);
 app.use(haltOnTimedout);

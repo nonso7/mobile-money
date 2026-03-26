@@ -42,6 +42,29 @@ export const transactionErrorsTotal = new Counter({
   registers: [register],
 });
 
+// Mobile Money Provider Metrics
+export const providerResponseTimeSeconds = new Histogram({
+  name: "provider_response_time_seconds",
+  help: "Response time of mobile money provider API calls in seconds",
+  labelNames: ["provider", "operation", "status"],
+  buckets: [0.1, 0.5, 1, 2, 5, 10, 20, 30],
+  registers: [register],
+});
+
+export const slowRequestsTotal = new Counter({
+  name: "slow_requests_total",
+  help: "Total number of mobile money provider requests taking > 5 seconds",
+  labelNames: ["provider", "operation"],
+  registers: [register],
+});
+
+export const timeoutRequestsTotal = new Counter({
+  name: "timeout_requests_total",
+  help: "Total number of mobile money provider requests that timed out",
+  labelNames: ["provider", "operation"],
+  registers: [register],
+});
+
 // Connection Metrics
 export const activeConnections = new Gauge({
   name: "active_connections",
