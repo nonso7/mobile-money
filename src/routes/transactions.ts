@@ -48,10 +48,11 @@ transactionRoutes.post(
 
 // Get single transaction
 transactionRoutes.get(
-  "/:id",
+  "/",
   TimeoutPresets.quick,
   haltOnTimedout,
-  getTransactionHandler,
+  validateTransactionFilters,
+  listTransactionsHandler,
 );
 
 // Update notes
