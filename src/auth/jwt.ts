@@ -1,10 +1,17 @@
-import jwt from 'jsonwebtoken';
-import dotenv from 'dotenv';
+import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
 
 dotenv.config();
 
-const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_EXPIRES_IN = '1h';
+const JWT_EXPIRES_IN = "1h";
+
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("JWT_SECRET is not defined in environment variables");
+  }
+  return secret;
+}
 
 export interface JWTPayload {
   userId: string;
@@ -18,12 +25,10 @@ export interface JWTPayload {
  * @param payload - User data to include in the token
  * @returns Signed JWT token
  */
-export function generateToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): string {
-  if (!JWT_SECRET) {
-    throw new Error('JWT_SECRET is not defined in environment variables');
-  }
-
-  return jwt.sign(payload, JWT_SECRET, {
+export function generateToken(
+  payload: Omit<JWTPayload, "iat" | "exp">,
+): string {
+  return jwt.sign(payload, getJwtSecret(), {
     expiresIn: JWT_EXPIRES_IN,
   });
 }
@@ -35,20 +40,18 @@ export function generateToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): string 
  * @throws Error if token is invalid or expired
  */
 export function verifyToken(token: string): JWTPayload {
-  if (!JWT_SECRET) {
-    throw new Error('JWT_SECRET is not defined in environment variables');
-  }
+  const secret = getJwtSecret();
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
+    const decoded = jwt.verify(token, secret) as JWTPayload;
     return decoded;
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
-      throw new Error('Token has expired');
+      throw new Error("Token has expired");
     } else if (error instanceof jwt.JsonWebTokenError) {
-      throw new Error('Invalid token');
+      throw new Error("Invalid token");
     } else {
-      throw new Error('Token verification failed');
+      throw new Error("Token verification failed");
     }
   }
 }
@@ -63,6 +66,6 @@ export function isTokenExpired(token: string): boolean {
     verifyToken(token);
     return false;
   } catch (error) {
-    return error instanceof Error && error.message === 'Token has expired';
+    return error instanceof Error && error.message === "Token has expired";
   }
 }

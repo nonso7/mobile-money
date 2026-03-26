@@ -1,15 +1,5 @@
-import { Request, Response, NextFunction } from 'express';
-import { pool } from '../config/database';
-
-// Extend Request interface to include user role information
-declare global {
-  namespace Express {
-    interface Request {
-      userRole?: string;
-      userPermissions?: string[];
-    }
-  }
-}
+import { Request, Response, NextFunction } from "express";
+import { pool } from "../config/database";
 
 export interface RBACRequest extends Request {
   user?: {
@@ -29,22 +19,24 @@ async function getUserPermissions(roleId: string): Promise<string[]> {
     JOIN role_permissions rp ON p.id = rp.permission_id
     WHERE rp.role_id = $1
   `;
-  
+
   const result = await pool.query(query, [roleId]);
-  return result.rows.map(row => row.permission_name);
+  return result.rows.map((row) => row.permission_name);
 }
 
 /**
  * Get user role information from database
  */
-async function getUserRole(userId: string): Promise<{ role_name: string; role_id: string } | null> {
+async function getUserRole(
+  userId: string,
+): Promise<{ role_name: string; role_id: string } | null> {
   const query = `
     SELECT r.name as role_name, r.id as role_id
     FROM users u
     JOIN roles r ON u.role_id = r.id
     WHERE u.id = $1
   `;
-  
+
   const result = await pool.query(query, [userId]);
   return result.rows.length > 0 ? result.rows[0] : null;
 }
@@ -58,8 +50,8 @@ export function requirePermission(permission: string) {
       // Check if user is authenticated (JWT middleware should have set jwtUser)
       if (!req.jwtUser) {
         return res.status(401).json({
-          error: 'Unauthorized',
-          message: 'Authentication required'
+          error: "Unauthorized",
+          message: "Authentication required",
         });
       }
 
@@ -67,14 +59,14 @@ export function requirePermission(permission: string) {
       const userRole = await getUserRole(req.jwtUser.userId);
       if (!userRole) {
         return res.status(403).json({
-          error: 'Forbidden',
-          message: 'User role not found'
+          error: "Forbidden",
+          message: "User role not found",
         });
       }
 
       // Get user permissions
       const permissions = await getUserPermissions(userRole.role_id);
-      
+
       // Attach role and permissions to request for downstream use
       req.userRole = userRole.role_name;
       req.userPermissions = permissions;
@@ -82,19 +74,19 @@ export function requirePermission(permission: string) {
       // Check if user has the required permission
       if (!permissions.includes(permission)) {
         return res.status(403).json({
-          error: 'Forbidden',
+          error: "Forbidden",
           message: `Insufficient permissions. Required: ${permission}`,
           userRole: userRole.role_name,
-          userPermissions: permissions
+          userPermissions: permissions,
         });
       }
 
       next();
     } catch (error) {
-      console.error('RBAC permission check error:', error);
+      console.error("RBAC permission check error:", error);
       return res.status(500).json({
-        error: 'Internal server error',
-        message: 'Failed to check permissions'
+        error: "Internal server error",
+        message: "Failed to check permissions",
       });
     }
   };
@@ -108,44 +100,44 @@ export function requireAnyPermission(permissions: string[]) {
     try {
       if (!req.jwtUser) {
         return res.status(401).json({
-          error: 'Unauthorized',
-          message: 'Authentication required'
+          error: "Unauthorized",
+          message: "Authentication required",
         });
       }
 
       const userRole = await getUserRole(req.jwtUser.userId);
       if (!userRole) {
         return res.status(403).json({
-          error: 'Forbidden',
-          message: 'User role not found'
+          error: "Forbidden",
+          message: "User role not found",
         });
       }
 
       const userPermissions = await getUserPermissions(userRole.role_id);
-      
+
       req.userRole = userRole.role_name;
       req.userPermissions = userPermissions;
 
       // Check if user has any of the required permissions
-      const hasPermission = permissions.some(permission => 
-        userPermissions.includes(permission)
+      const hasPermission = permissions.some((permission) =>
+        userPermissions.includes(permission),
       );
 
       if (!hasPermission) {
         return res.status(403).json({
-          error: 'Forbidden',
-          message: `Insufficient permissions. Required any of: ${permissions.join(', ')}`,
+          error: "Forbidden",
+          message: `Insufficient permissions. Required any of: ${permissions.join(", ")}`,
           userRole: userRole.role_name,
-          userPermissions: userPermissions
+          userPermissions: userPermissions,
         });
       }
 
       next();
     } catch (error) {
-      console.error('RBAC permission check error:', error);
+      console.error("RBAC permission check error:", error);
       return res.status(500).json({
-        error: 'Internal server error',
-        message: 'Failed to check permissions'
+        error: "Internal server error",
+        message: "Failed to check permissions",
       });
     }
   };
@@ -159,16 +151,16 @@ export function requireRole(role: string) {
     try {
       if (!req.jwtUser) {
         return res.status(401).json({
-          error: 'Unauthorized',
-          message: 'Authentication required'
+          error: "Unauthorized",
+          message: "Authentication required",
         });
       }
 
       const userRole = await getUserRole(req.jwtUser.userId);
       if (!userRole) {
         return res.status(403).json({
-          error: 'Forbidden',
-          message: 'User role not found'
+          error: "Forbidden",
+          message: "User role not found",
         });
       }
 
@@ -177,17 +169,17 @@ export function requireRole(role: string) {
 
       if (userRole.role_name !== role) {
         return res.status(403).json({
-          error: 'Forbidden',
-          message: `Insufficient role. Required: ${role}, Current: ${userRole.role_name}`
+          error: "Forbidden",
+          message: `Insufficient role. Required: ${role}, Current: ${userRole.role_name}`,
         });
       }
 
       next();
     } catch (error) {
-      console.error('RBAC role check error:', error);
+      console.error("RBAC role check error:", error);
       return res.status(500).json({
-        error: 'Internal server error',
-        message: 'Failed to check role'
+        error: "Internal server error",
+        message: "Failed to check role",
       });
     }
   };
@@ -197,7 +189,7 @@ export function requireRole(role: string) {
  * Middleware to check if user can access their own data
  * This checks for 'read:own' or 'write:own' permissions based on the action
  */
-export function requireOwnDataAccess(action: 'read' | 'write' | 'delete') {
+export function requireOwnDataAccess(action: "read" | "write" | "delete") {
   const permission = `${action}:own`;
   return requirePermission(permission);
 }
@@ -205,23 +197,30 @@ export function requireOwnDataAccess(action: 'read' | 'write' | 'delete') {
 /**
  * Middleware to check if user has admin-level access
  */
-export const requireAdmin = requireRole('admin');
+export const requireAdmin = requireRole("admin");
 
 /**
  * Middleware to check if user can read data (own or all)
  */
-export const requireReadAccess = requireAnyPermission(['read:own', 'read:all']);
+export const requireReadAccess = requireAnyPermission(["read:own", "read:all"]);
 
 /**
  * Middleware to check if user can write data (own or all)
  */
-export const requireWriteAccess = requireAnyPermission(['write:own', 'write:all']);
+export const requireWriteAccess = requireAnyPermission([
+  "write:own",
+  "write:all",
+]);
 
 /**
  * Middleware to attach role and permissions to request without checking access
  * Useful for endpoints that need user context but don't require specific permissions
  */
-export async function attachUserContext(req: Request, res: Response, next: NextFunction) {
+export async function attachUserContext(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
   try {
     if (!req.jwtUser) {
       return next();
@@ -235,7 +234,7 @@ export async function attachUserContext(req: Request, res: Response, next: NextF
 
     next();
   } catch (error) {
-    console.error('Failed to attach user context:', error);
+    console.error("Failed to attach user context:", error);
     // Don't block the request, just continue without context
     next();
   }

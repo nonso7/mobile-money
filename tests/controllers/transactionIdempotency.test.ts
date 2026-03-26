@@ -82,6 +82,10 @@ jest.mock("../../src/middleware/timeout", () => ({
   haltOnTimedout: (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 
+jest.mock("../../src/middleware/auth", () => ({
+  authenticateToken: (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
+
 import { transactionRoutes } from "../../src/routes/transactions";
 import { TransactionStatus } from "../../src/models/transaction";
 

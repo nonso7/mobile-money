@@ -27,6 +27,7 @@ import type { TransactionJobData } from "../queue/transactionQueue";
 const IDEMPOTENCY_TTL_HOURS = Number(
   process.env.IDEMPOTENCY_KEY_TTL_HOURS || 24,
 );
+const timeoutMinutes = Number(process.env.TRANSACTION_TIMEOUT_MINUTES || 30);
 
 type TransactionRequestType = "deposit" | "withdraw";
 type CreateTransactionResponse = TransactionResponse;
@@ -650,9 +651,7 @@ export const updateMetadataHandler = async (req: Request, res: Response) => {
       err instanceof Error ? err.message : "Failed to update metadata";
 
     return res
-      .status(
-        err instanceof Error && err.message.includes("size") ? 400 : 500,
-      )
+      .status(err instanceof Error && err.message.includes("size") ? 400 : 500)
       .json({ error: message });
   }
 };
@@ -681,9 +680,7 @@ export const patchMetadataHandler = async (req: Request, res: Response) => {
       err instanceof Error ? err.message : "Failed to patch metadata";
 
     return res
-      .status(
-        err instanceof Error && err.message.includes("size") ? 400 : 500,
-      )
+      .status(err instanceof Error && err.message.includes("size") ? 400 : 500)
       .json({ error: message });
   }
 };
@@ -714,10 +711,7 @@ export const deleteMetadataKeysHandler = async (
   }
 };
 
-export const searchByMetadataHandler = async (
-  req: Request,
-  res: Response,
-) => {
+export const searchByMetadataHandler = async (req: Request, res: Response) => {
   try {
     const { filter } = req.body;
 
@@ -727,9 +721,7 @@ export const searchByMetadataHandler = async (
       typeof filter !== "object" ||
       Array.isArray(filter)
     ) {
-      return res
-        .status(400)
-        .json({ error: "filter must be a JSON object" });
+      return res.status(400).json({ error: "filter must be a JSON object" });
     }
 
     const transactions = await transactionModel.findByMetadata(filter);

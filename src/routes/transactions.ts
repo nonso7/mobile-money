@@ -15,7 +15,6 @@ import {
 import { validateTransaction } from "../middleware/validateTransaction";
 import { TimeoutPresets, haltOnTimedout } from "../middleware/timeout";
 import { authenticateToken } from "../middleware/auth";
-import { validateTransaction } from "../middleware/validateTransaction";
 
 export const transactionRoutes = Router();
 
@@ -39,7 +38,7 @@ transactionRoutes.post(
   TimeoutPresets.long,
   haltOnTimedout,
   validateTransaction,
-  depositHandler
+  depositHandler,
 );
 
 transactionRoutes.post(
@@ -48,7 +47,7 @@ transactionRoutes.post(
   TimeoutPresets.long,
   haltOnTimedout,
   validateTransaction,
-  withdrawHandler
+  withdrawHandler,
 );
 
 transactionRoutes.get(
@@ -56,7 +55,7 @@ transactionRoutes.get(
   authenticateToken,
   TimeoutPresets.quick,
   haltOnTimedout,
-  getTransactionHandler
+  getTransactionHandler,
 );
 
 transactionRoutes.post(

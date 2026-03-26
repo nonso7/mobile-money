@@ -154,10 +154,7 @@ export const transactionWorker = new Worker<
             amount,
           );
           if (!mobileMoneyResult.success) {
-            throw new Error(
-              (mobileMoneyResult.error as string) ||
-                "Payment initiation failed",
-            );
+            throw new Error(getProviderFailureMessage(mobileMoneyResult));
           }
           return mobileMoneyResult;
         }, retryConfig);
@@ -208,9 +205,7 @@ export const transactionWorker = new Worker<
             amount,
           );
           if (!mobileMoneyResult.success) {
-            throw new Error(
-              (mobileMoneyResult.error as string) || "Payout failed",
-            );
+            throw new Error(getProviderFailureMessage(mobileMoneyResult));
           }
           return mobileMoneyResult;
         }, retryConfig);
