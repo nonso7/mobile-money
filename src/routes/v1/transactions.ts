@@ -1,0 +1,109 @@
+import { Router } from "express";
+import { setApiVersion } from "../../middleware/apiVersion";
+import {
+  depositHandler,
+  withdrawHandler,
+  getTransactionHandler,
+  updateNotesHandler,
+  searchTransactionsHandler,
+  listTransactionsHandler,
+  updateMetadataHandler,
+  patchMetadataHandler,
+  deleteMetadataKeysHandler,
+  searchByMetadataHandler,
+} from "../../controllers/transactionController";
+import { TimeoutPresets, haltOnTimedout } from "../../middleware/timeout";
+import { validateTransactionFilters } from "../../utils/transactionFilters";
+
+export const transactionRoutesV1 = Router();
+
+// Deposit transaction route
+transactionRoutesV1.post(
+  "/deposit",
+  TimeoutPresets.long,
+  haltOnTimedout,
+  setApiVersion("v1"),
+  depositHandler
+);
+
+// Withdraw transaction route
+transactionRoutesV1.post(
+  "/withdraw",
+  TimeoutPresets.long,
+  haltOnTimedout,
+  setApiVersion("v1"),
+  withdrawHandler
+);
+
+// List transactions with status filtering and pagination
+transactionRoutesV1.get(
+  "/",
+  TimeoutPresets.quick,
+  haltOnTimedout,
+  validateTransactionFilters,
+  setApiVersion("v1"),
+  listTransactionsHandler,
+);
+
+// Get specific transaction
+transactionRoutesV1.get(
+  "/:id",
+  TimeoutPresets.quick,
+  haltOnTimedout,
+  setApiVersion("v1"),
+  getTransactionHandler
+);
+
+// Update transaction notes
+transactionRoutesV1.patch(
+  "/:id/notes",
+  TimeoutPresets.quick,
+  haltOnTimedout,
+  setApiVersion("v1"),
+  updateNotesHandler
+);
+
+// Search transactions
+transactionRoutesV1.get(
+  "/search",
+  TimeoutPresets.quick,
+  haltOnTimedout,
+  setApiVersion("v1"),
+  searchTransactionsHandler
+);
+
+// Replace metadata
+transactionRoutesV1.put(
+  "/:id/metadata",
+  TimeoutPresets.quick,
+  haltOnTimedout,
+  setApiVersion("v1"),
+  updateMetadataHandler,
+);
+
+// Merge metadata keys
+transactionRoutesV1.patch(
+  "/:id/metadata",
+  TimeoutPresets.quick,
+  haltOnTimedout,
+  setApiVersion("v1"),
+  patchMetadataHandler,
+);
+
+// Delete metadata keys
+transactionRoutesV1.delete(
+  "/:id/metadata",
+  TimeoutPresets.quick,
+  haltOnTimedout,
+  setApiVersion("v1"),
+  deleteMetadataKeysHandler,
+);
+
+// Search by metadata
+transactionRoutesV1.post(
+  "/search/metadata",
+  TimeoutPresets.quick,
+  haltOnTimedout,
+  setApiVersion("v1"),
+  searchByMetadataHandler,
+);
