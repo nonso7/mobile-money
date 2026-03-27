@@ -70,7 +70,5 @@ SELECT
   u.id,
   u.id
 FROM users u 
-JOIN roles r ON u.role_id = r.id 
-WHERE r.name = 'admin' 
 LIMIT 1
 ON CONFLICT (name) DO NOTHING;
